@@ -3,11 +3,12 @@ from modules.VGG_NN import VGG
 import torch.optim as optim
 
 class Node:
-    def __init__(self, id, model) -> None:
+    def __init__(self, id, model, learning_rate) -> None:
         self.id = id
         if model == 'VGG19':
             self.model = VGG('VGG19').cuda() 
-            self.opt = optim.SGD(self.model.parameters(), lr=0.1)
+            self.opt = optim.SGD(self.model.parameters(), lr=learning_rate)
+            self.model.weights_init()
             
 
     # def init_model(self):

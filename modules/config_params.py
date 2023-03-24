@@ -2,7 +2,6 @@
 import os
 import random
 import torch, torchvision
-import torch.nn as nn
 import torch.nn.functional as F
 from torchvision import datasets, transforms
 from torch.utils.data.dataset import Dataset   
@@ -30,6 +29,7 @@ class ConfigParams:
         self.losses_test = []
         self.acc_train = []
         self.acc_test = []
+        self.losses_retrain=[]
    
    
 
@@ -74,6 +74,9 @@ class ConfigParams:
 
     def losses_train_append(self, val):
         self.losses_train.append(val)
+ 
+    def losses_retrain_append(self, val):
+        self.losses_retrain.append(val)
     
     def losses_test_append(self, test_loss):
         self.losses_test.append(test_loss)

@@ -1,4 +1,5 @@
 from .config_params import *
+import torch.nn as nn
 
 #################################
 ##### Neural Network model #####
@@ -22,6 +23,14 @@ class VGG(nn.Module):
             nn.ReLU(True),
             nn.Linear(512, 10)
         )
+
+    def weights_init(m):
+        if isinstance(m, nn.Conv2d):
+            torch.nn.init.xavier_uniform_(m.weight)
+            m.bias.data.fill_(0.01)
+        elif isinstance(m, nn.Linear):
+            torch.nn.init.xavier_uniform_(m.weight)
+            m.bias.data.fill_(0.01)
 
     def forward(self, x):
         out = self.features(x)

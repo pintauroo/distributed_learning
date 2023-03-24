@@ -19,39 +19,68 @@ def main():
     # # Parse command-line arguments
     # args = parser.parse_args()
     # args.input
+    
     num_clients=20
     epochs=5
+    learning_rate=0.1
+    classes_pc = 2
+    num_selected = 6
+    num_rounds = 150
+    batch_size = 32
+    baseline_num = 100
+    retrain_epochs = 20
 
-    config = c.ConfigParams(batch_size=32, epochs= 5, num_clients=20, num_rounds= 150, num_selected=6)
-    datsetHandler = d.DatasetHandler(batch_size=32, num_clients=20)
+    config = c.ConfigParams(batch_size=batch_size, epochs=epochs, num_clients=num_clients, num_rounds=num_rounds, num_selected=num_selected)
+    datsetHandler = d.DatasetHandler(batch_size=batch_size, num_clients=num_clients)
     helper = h.Helpers()
     nodes = {}
     
     # init client and server nodes
     for id in range(num_clients):
-      nodes[id] = n.Node(id=id, model='VGG19')
+      nodes[id] = n.Node(id=id, model='VGG19', learning_rate=learning_rate)
 
-    srv = n.Node(id=999, model='VGG19')
+    srv = n.Node(id=999, model='VGG19', learning_rate=learning_rate)
 
+    loader_fixed = helper.baseline_data(num=baseline_num, datsetHandler=datsetHandler)
+    train_loader, test_loader = datsetHandler.get_data_loaders(classes_pc=classes_pc, nclients= num_clients,
+                                                      batch_size=batch_size,verbose=True)
 
     # training loop
     for r in range(config.get_num_rounds()):
       # select random clients
       client_idx = np.random.permutation(config.get_num_clients())[:config.get_num_selected()]
+      client_lens = [len(train_loader[idx]) for idx in client_idx]# client update
+      
       # client update
       loss = 0
       for i in tqdm(range(config.get_num_selected())):
-          loss += helper.client_update(client_model=nodes[i].get_model(), optimizer=nodes[i].get_opt(), train_loader=datsetHandler.get_train_loader(client_idx[i]), epoch=epochs)
+          helper.client_syn(client_model=nodes[i].get_model(), global_model=srv.get_model())
+          loss += helper.client_update(client_model=nodes[i].get_model(), optimizer=nodes[i].get_opt(), train_loader=train_loader[client_idx[i]], epoch=epochs)
       
       config.losses_train_append(loss)
       # server aggregate
-      helper.server_aggregate(srv.get_model(), [nodes[id].get_model() for id in range(num_clients)])
+      #### retraining on the global server
+      loss_retrain =0
+      for i in tqdm(range(num_selected)):
+        loss_retrain+= helper.client_update(client_model=nodes[i].get_model(), optimizer=nodes[i].get_opt(), train_loader=loader_fixed, epoch=retrain_epochs)
+      config.losses_retrain_append(loss_retrain)
       
-      test_loss, acc = helper.test(srv.get_model(), datsetHandler.get_test_loader())
+      ### Aggregating the models
+      helper.server_aggregate(srv.get_model(), [nodes[id].get_model() for id in range(num_clients)], client_lens)
+      
+      test_loss, acc = helper.test(global_model=srv.get_model(), test_loader=test_loader)
       config.losses_test_append(test_loss)
       config.acc_test_append(acc)
       print('%d-th round' % r)
       print('average train loss %0.3g | test loss %0.3g | test acc: %0.3f' % (loss / config.get_num_selected(), test_loss, acc))
+
+
+def main_test():
+  print('ktm')
+  datsetHandler = d.DatasetHandler(num_clients=20, batch_size=32)
+  helper = h.Helpers()
+  loader = helper.baseline_data(num=100, datsetHandler=datsetHandler)
+
 
 if __name__ == '__main__':
     main()
